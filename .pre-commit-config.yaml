@@ -1,22 +1,43 @@
+ci:
+  autofix_prs: false
+
 repos:
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.1.4
+  - repo: https://github.com/lucianopaz/head_of_apache
+    rev: "0.1.1"
     hooks:
-      - id: ruff
+      - id: head_of_apache
+        args:
+          - --author=The PyMC Labs Developers
+          - --exclude=docs/
+          - --exclude=scripts/
+          - --start-year=2022
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.0
+    hooks:
+      - id: ruff-check
+        types_or: [python, pyi, jupyter]
+        args: ["--fix", "--output-format=full"]
+        exclude: ^docs/source/notebooks/clv/dev/
       - id: ruff-format
+        types_or: [python, pyi, jupyter]
+        exclude: ^docs/source/notebooks/clv/dev/
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.2.0
+    rev: v1.18.2
     hooks:
       - id: mypy
         args: [--ignore-missing-imports]
         files: ^pymc_marketing/
         additional_dependencies: [numpy>=1.20, pandas-stubs]
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.2.0
+    rev: v6.0.0
     hooks:
+      - id: no-commit-to-branch
+        args: [--branch, main]
+        stages: [pre-commit, pre-merge-commit, pre-push, manual]
       - id: debug-statements
       - id: trailing-whitespace
       - id: end-of-file-fixer
+      - id: check-toml
       - id: check-yaml
       - id: check-added-large-files
-        exclude: ^notebooks/
+        exclude: ^docs/source/notebooks/

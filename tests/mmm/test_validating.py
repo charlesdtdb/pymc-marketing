@@ -1,3 +1,16 @@
+#   Copyright 2022 - 2025 The PyMC Labs Developers
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
 import numpy as np
 import pandas as pd
 import pytest
@@ -41,7 +54,7 @@ def test_validation_method():
     assert vf.__name__ == f.__name__
 
     def f2(x):
-        """bla"""
+        """Bla"""
         return x
 
     vf = validation_method_X(f2)
@@ -52,14 +65,14 @@ def test_validation_method():
     class F:
         @validation_method_X
         def f3(self, x):
-            """bla"""
+            """Bla"""
             return x
 
     vf = F().f3
     assert getattr(vf, "_tags", {}).get("validation_X", False)
     assert F.f3.__doc__ == vf.__doc__
     assert F.f3.__name__ == vf.__name__
-    assert vf.__doc__ == "bla"
+    assert vf.__doc__ == "Bla"
     assert vf.__name__ == "f3"
 
 
@@ -72,9 +85,9 @@ def test_validate_date_col():
     obj = ValidateDateColumn()
     obj.date_column = "date"
     assert obj.validate_date_col(toy_X) is None
-    with pytest.raises(ValueError, match="date_col date not in data"):
+    with pytest.raises(ValueError, match=r"date_col date not in data"):
         obj.validate_date_col(toy_X.drop(columns=["date"]))
-    with pytest.raises(ValueError, match="date_col date has repeated values"):
+    with pytest.raises(ValueError, match=r"date_col date has repeated values"):
         obj.validate_date_col(pd.concat([toy_X, toy_X], ignore_index=True, axis=0))
 
 
@@ -83,27 +96,27 @@ def test_channel_columns():
     obj.channel_columns = ["channel_1", "channel_2"]
     assert obj.validate_channel_columns(toy_X) is None
 
-    with pytest.raises(ValueError, match="channel_columns must be a list or tuple"):
+    with pytest.raises(ValueError, match=r"channel_columns must be a list or tuple"):
         obj.channel_columns = {}
         obj.validate_channel_columns(toy_X)
-    with pytest.raises(ValueError, match="channel_columns must not be empty"):
+    with pytest.raises(ValueError, match=r"channel_columns must not be empty"):
         obj.channel_columns = []
         obj.validate_channel_columns(toy_X)
     with pytest.raises(
         ValueError,
-        match="channel_columns \['out_of_columns'\] not in data",  # noqa: W605
+        match=r"channel_columns \['out_of_columns'\] not in data",
     ):
         obj.channel_columns = ["out_of_columns"]
         obj.validate_channel_columns(toy_X)
     with pytest.raises(
         ValueError,
-        match="channel_columns \['channel_1', 'channel_1'\] contains duplicates",  # noqa: E501, W605
+        match=r"channel_columns \['channel_1', 'channel_1'\] contains duplicates",
     ):
         obj.channel_columns = ["channel_1", "channel_1"]
         obj.validate_channel_columns(toy_X)
-    with pytest.raises(
-        ValueError,
-        match="channel_columns \['channel_1'\] contains negative values",  # noqa: E501, W605
+    with pytest.warns(
+        UserWarning,
+        match=r"channel_columns \['channel_1'\] contains negative values",
     ):
         new_toy_X = toy_X.copy()
         new_toy_X["channel_1"] -= 1e4
@@ -119,24 +132,24 @@ def test_control_columns():
     assert obj.validate_control_columns(toy_X) is None
 
     with pytest.raises(
-        ValueError, match="control_columns must be None, a list or tuple"
+        ValueError, match=r"control_columns must be None, a list or tuple"
     ):
         obj.control_columns = {}
         obj.validate_control_columns(toy_X)
     with pytest.raises(
-        ValueError, match="If control_columns is not None, then it must not be empty"
+        ValueError, match=r"If control_columns is not None, then it must not be empty"
     ):
         obj.control_columns = []
         obj.validate_control_columns(toy_X)
     with pytest.raises(
         ValueError,
-        match="control_columns \['out_of_columns'\] not in data",  # noqa: W605
+        match=r"control_columns \['out_of_columns'\] not in data",
     ):
         obj.control_columns = ["out_of_columns"]
         obj.validate_control_columns(toy_X)
     with pytest.raises(
         ValueError,
-        match="control_columns \['control_1', 'control_1'\] contains duplicates",  # noqa: E501, W605
+        match=r"control_columns \['control_1', 'control_1'\] contains duplicates",
     ):
         obj.control_columns = ["control_1", "control_1"]
         obj.validate_control_columns(toy_X)
@@ -144,5 +157,5 @@ def test_control_columns():
 
 def test_y_len_0():
     obj = ValidateTargetColumn()
-    with pytest.raises(ValueError, match="y must have at least one element"):
+    with pytest.raises(ValueError, match=r"y must have at least one element"):
         obj.validate_target(pd.Series())

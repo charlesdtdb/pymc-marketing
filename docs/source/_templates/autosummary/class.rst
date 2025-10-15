@@ -1,4 +1,4 @@
-{{ fullname | escape | underline}}
+{{ name | escape | underline}}
 
 .. currentmodule:: {{ module }}
 
@@ -10,7 +10,7 @@
    .. rubric:: Methods
 
    .. autosummary::
-      :toctree:
+      :toctree: classmethods
 
    {% for item in methods %}
       {{ objname }}.{{ item }}

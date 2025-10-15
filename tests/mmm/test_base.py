@@ -1,3 +1,17 @@
+#   Copyright 2022 - 2025 The PyMC Labs Developers
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+import json
 import re
 from unittest.mock import Mock, patch
 
@@ -8,12 +22,15 @@ import pytest
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import FunctionTransformer, Pipeline
 
-from pymc_marketing.mmm.base import MMM
+from pymc_marketing.mmm.base import BaseValidateMMM as MMM
 from pymc_marketing.mmm.preprocessing import (
     preprocessing_method_X,
     preprocessing_method_y,
 )
-from pymc_marketing.mmm.validating import validation_method_X, validation_method_y
+from pymc_marketing.mmm.validating import (
+    validation_method_X,
+    validation_method_y,
+)
 
 seed: int = sum(map(ord, "pymc_marketing"))
 rng: np.random.Generator = np.random.default_rng(seed=seed)
@@ -49,11 +66,30 @@ def toy_mmm(request, toy_X, toy_y):
     channel_columns = request.param["channel_columns"]
 
     class ToyMMM(MMM):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
+        def __init__(
+            self,
+            date_column: str,
+            channel_columns,
+            model_config=None,
+            sampler_config=None,
+        ) -> None:
+            super().__init__(
+                date_column=date_column,
+                channel_columns=channel_columns,
+                model_config=model_config,
+                sampler_config=sampler_config,
+            )
+
             self.X = None
             self.y = None
             self.preprocessed_data = {"X": None, "y": None}
+
+        def create_idata_attrs(self) -> dict[str, str]:
+            attrs = super().create_idata_attrs()
+            attrs["date_column"] = self.data_column
+            attrs["channel_columns"] = self.channel_columns
+
+            return attrs
 
         def build_model(*args, **kwargs):
             pass
@@ -68,11 +104,11 @@ def toy_mmm(request, toy_X, toy_y):
 
         @property
         def default_model_config(self):
-            pass
+            return {}
 
         @property
         def default_sampler_config(self):
-            pass
+            return {}
 
         @property
         def output_var(self):
@@ -111,9 +147,11 @@ def toy_mmm(request, toy_X, toy_y):
 
 
 class TestMMM:
-    @patch("pymc_marketing.mmm.base.MMM.validate_target")
-    @patch("pymc_marketing.mmm.base.MMM.validate_date_col")
-    @patch("pymc_marketing.mmm.base.MMM.validate_channel_columns")
+    @patch("pymc_marketing.mmm.validating.ValidateTargetColumn.validate_target")
+    @patch("pymc_marketing.mmm.validating.ValidateDateColumn.validate_date_col")
+    @patch(
+        "pymc_marketing.mmm.validating.ValidateChannelColumns.validate_channel_columns"
+    )
     @pytest.mark.parametrize(
         "toy_mmm",
         [
@@ -151,11 +189,30 @@ def test_mmm():
         mock_method2 = Mock()
         validation_methods = [(mock_method1,), (mock_method2,)]
 
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
+        def __init__(
+            self,
+            date_column: str,
+            channel_columns,
+            model_config=None,
+            sampler_config=None,
+        ) -> None:
+            super().__init__(
+                date_column=date_column,
+                channel_columns=channel_columns,
+                model_config=model_config,
+                sampler_config=sampler_config,
+            )
+
             self.X = None
             self.y = None
             self.preprocessed_data = {"X": None, "y": None}
+
+        def create_idata_attrs(self) -> dict[str, str]:
+            attrs = super().create_idata_attrs()
+            attrs["date_column"] = self.date_column
+            attrs["channel_columns"] = json.dumps(self.channel_columns)
+
+            return attrs
 
         def build_model(self, toy_X, *args, **kwargs):
             with pm.Model() as self.model:
@@ -207,17 +264,15 @@ class MyScaler(BaseEstimator, TransformerMixin):
 
 
 def test_validate_and_preprocess(toy_X, toy_y, test_mmm):
-    test_mmm
-
     test_mmm.validate("X", toy_X)
     test_mmm.mock_method1.assert_called_once_with(test_mmm, toy_X)
 
     test_mmm.validate("y", toy_y)
     test_mmm.mock_method2.assert_called_once_with(test_mmm, toy_y)
 
-    with pytest.raises(ValueError, match="Target must be either 'X' or 'y'"):
+    with pytest.raises(ValueError, match=r"Target must be either 'X' or 'y'"):
         test_mmm.validate("invalid", toy_X)
-    with pytest.raises(ValueError, match="Target must be either 'X' or 'y'"):
+    with pytest.raises(ValueError, match=r"Target must be either 'X' or 'y'"):
         test_mmm.preprocess("invalid", toy_X)
 
 
@@ -252,12 +307,19 @@ def test_calling_prior_predictive_before_fit_raises_error(test_mmm, toy_X, toy_y
     test_mmm.idata = None
     with pytest.raises(
         RuntimeError,
-        match=re.escape("The model hasn't been fit yet, call .fit() first"),
+        match=re.escape(
+            "The model hasn't been sampled yet, call .sample_prior_predictive() first"
+        ),
     ):
         test_mmm.prior_predictive
 
 
-def test_calling_fit_result_before_fit_raises_error(test_mmm, toy_X, toy_y):
+def test_calling_fit_result_before_fit_raises_error(
+    test_mmm,
+    toy_X,
+    toy_y,
+    mock_pymc_sample,
+):
     # Arrange
     test_mmm.idata = None
     with pytest.raises(
@@ -269,3 +331,41 @@ def test_calling_fit_result_before_fit_raises_error(test_mmm, toy_X, toy_y):
     test_mmm.fit_result
     assert test_mmm.idata is not None
     assert "posterior" in test_mmm.idata
+
+
+def test_calling_prior_before_sample_prior_predictive_raises_error(
+    test_mmm, toy_X, toy_y
+):
+    # Arrange
+    test_mmm.idata = None
+    with pytest.raises(
+        RuntimeError,
+        match=re.escape(
+            "The model hasn't been sampled yet, call .sample_prior_predictive() first",
+        ),
+    ):
+        test_mmm.prior
+
+
+def test_plot_prior_predictive_no_fitted(test_mmm) -> None:
+    with pytest.raises(
+        RuntimeError,
+        match=r"Make sure the model has been fitted and the prior_predictive has been sampled!",
+    ):
+        test_mmm.plot_prior_predictive()
+
+
+def test_plot_posterior_predictive_no_fitted(test_mmm) -> None:
+    with pytest.raises(
+        RuntimeError,
+        match=r"Make sure the model has been fitted and the posterior_predictive has been sampled!",
+    ):
+        test_mmm.plot_posterior_predictive()
+
+
+def test_get_errors_raises_not_fitted(test_mmm) -> None:
+    with pytest.raises(
+        RuntimeError,
+        match=r"Make sure the model has been fitted and the posterior_predictive has been sampled!",
+    ):
+        test_mmm.get_errors()

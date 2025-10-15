@@ -1,16 +1,33 @@
-from typing import Dict, Optional, Sequence, Union
+#   Copyright 2022 - 2025 The PyMC Labs Developers
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+"""Shifted Beta Geometric model."""
+
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
 import pymc as pm
 from pymc.util import RandomState
+from pymc_extras.prior import Prior
 from xarray import DataArray, Dataset
 
 from pymc_marketing.clv.models import CLVModel
+from pymc_marketing.model_config import ModelConfig
 
 
 class ShiftedBetaGeoModelIndividual(CLVModel):
-    """Shifted Beta Geometric model
+    """Shifted Beta Geometric model.
 
     Model for customer behavior in a discrete contractual setting. It assumes that:
       * At the end of each period, a customer has a probability `theta` of renewing the contract
@@ -31,7 +48,8 @@ class ShiftedBetaGeoModelIndividual(CLVModel):
         observation period
             * `T`: Maximum observed time period (starting at 0)
     model_config: dict, optional
-        Dictionary of model prior parameters. If not provided, the model will use default priors specified in the `default_model_config` class attribute.
+        Dictionary of model prior parameters. If not provided, the model will use default priors specified in the
+        `default_model_config` class attribute.
     sampler_config: dict, optional
         Dictionary of sampler parameters. Defaults to None.
 
@@ -41,6 +59,8 @@ class ShiftedBetaGeoModelIndividual(CLVModel):
         .. code-block:: python
 
             import pymc as pm
+
+            from pymc_extras.prior import Prior
             from pymc_marketing.clv import ShiftedBetaGeoModelIndividual
 
             model = ShiftedBetaGeoModelIndividual(
@@ -50,8 +70,8 @@ class ShiftedBetaGeoModelIndividual(CLVModel):
                     T=[8 for x in range(len(customer_id))],
                 }),
                 model_config={
-                    "alpha_prior": {"dist": "HalfNormal", "kwargs": {"sigma": 10}},
-                    "beta_prior": {"dist": "HalfStudentT", "kwargs": {"nu": 4, "sigma": 10}},
+                    "alpha": Prior("HalfNormal", sigma=10),
+                    "beta": Prior("HalfStudentT", nu=4, sigma=10),
                 },
                 sampler_config={
                     "draws": 1000,
@@ -82,6 +102,7 @@ class ShiftedBetaGeoModelIndividual(CLVModel):
     .. [1] Fader, P. S., & Hardie, B. G. (2007). How to project customer retention.
            Journal of Interactive Marketing, 21(1), 76-90.
            https://journals.sagepub.com/doi/pdf/10.1002/dir.20074
+
     """
 
     _model_type = "Shifted-Beta-Geometric Model (Individual Customers)"
@@ -89,49 +110,42 @@ class ShiftedBetaGeoModelIndividual(CLVModel):
     def __init__(
         self,
         data: pd.DataFrame,
-        model_config: Optional[Dict] = None,
-        sampler_config: Optional[Dict] = None,
+        model_config: ModelConfig | None = None,
+        sampler_config: dict | None = None,
     ):
-        try:
-            self.customer_id = data["customer_id"]
-        except KeyError:
-            raise KeyError("data must contain a 'customer_id' column")
-        try:
-            self.t_churn: np.ndarray = np.asarray(data["t_churn"])
-        except KeyError:
-            raise KeyError("data must contain a 't_churn' column")
-        try:
-            self.T: np.ndarray = np.asarray(data["T"])
-        except KeyError:
-            raise KeyError("data must contain a 'T' column")
-        super().__init__(model_config=model_config, sampler_config=sampler_config)
-        self.data = data
-        self.alpha_prior = self._create_distribution(self.model_config["alpha_prior"])
-        self.beta_prior = self._create_distribution(self.model_config["beta_prior"])
-        self._process_priors(self.alpha_prior, self.beta_prior)
+        self._validate_cols(
+            data,
+            required_cols=["customer_id", "t_churn", "T"],
+            must_be_unique=["customer_id"],
+        )
 
         if np.any(
-            (self.t_churn < 0) | (self.t_churn > self.T) | np.isnan(self.t_churn)
+            (data["t_churn"] < 0)
+            | (data["t_churn"] > data["T"])
+            | np.isnan(data["t_churn"])
         ):
             raise ValueError(
                 "t_churn must respect 0 < t_churn <= T.\n",
                 "Customers that are still alive should have t_churn = T",
             )
-        self.coords = {"customer_id": np.asarray(self.customer_id)}
+        super().__init__(
+            data=data, model_config=model_config, sampler_config=sampler_config
+        )
 
     @property
-    def default_model_config(self) -> Dict:
+    def default_model_config(self) -> dict:
+        """Default model configuration."""
         return {
-            "alpha_prior": {"dist": "HalfFlat", "kwargs": {}},
-            "beta_prior": {"dist": "HalfFlat", "kwargs": {}},
+            "alpha": Prior("HalfFlat"),
+            "beta": Prior("HalfFlat"),
         }
 
-    def build_model(  # type: ignore
-        self,
-    ) -> None:
-        with pm.Model(coords=self.coords) as self.model:
-            alpha = self.model.register_rv(self.alpha_prior, name="alpha")
-            beta = self.model.register_rv(self.beta_prior, name="beta")
+    def build_model(self) -> None:  # type: ignore[override]
+        """Build the model."""
+        coords = {"customer_id": self.data["customer_id"]}
+        with pm.Model(coords=coords) as self.model:
+            alpha = self.model_config["alpha"].create_variable("alpha")
+            beta = self.model_config["beta"].create_variable("beta")
 
             theta = pm.Beta("theta", alpha, beta, dims=("customer_id",))
 
@@ -140,13 +154,13 @@ class ShiftedBetaGeoModelIndividual(CLVModel):
                 "churn_censored",
                 churn_raw,
                 lower=None,
-                upper=self.T,
-                observed=self.t_churn,
+                upper=self.data["T"],
+                observed=self.data["t_churn"],
                 dims=("customer_id",),
             )
 
     def distribution_customer_churn_time(
-        self, customer_id: Union[np.ndarray, pd.Series], random_seed: RandomState = None
+        self, customer_id: np.ndarray | pd.Series, random_seed: RandomState = None
     ) -> DataArray:
         """Sample distribution of churn time for existing customers.
 
@@ -155,8 +169,7 @@ class ShiftedBetaGeoModelIndividual(CLVModel):
 
         It ignores that some customers may have already cancelled.
         """
-
-        coords = {"customer_id": np.asarray(customer_id)}
+        coords = {"customer_id": customer_id}
         with pm.Model(coords=coords):
             alpha = pm.HalfFlat("alpha")
             beta = pm.HalfFlat("beta")

@@ -46,16 +46,16 @@ For more instructions see the [Pull request checklist](#pull-request-checklist)
 
    Always use a feature branch. It's good practice to never routinely work on the `main` branch of any repository.
 
-1. Create an environment. For example:
+1. Create a dedicated development environment from the file present in the repo:
 
     ```bash
-    conda create -n pymc_marketing_env
+    conda env create -f environment.yml
     ```
 
-    Activate the environment.
+    This will create an environment called `pymc-marketing-dev`. Activate the environment.
 
     ```bash
-    conda activate pymc_marketing_env
+    conda activate pymc-marketing-dev
     ```
 
     Install the package (in editable mode) and its development dependencies:
@@ -128,24 +128,68 @@ We recommend that your contribution complies with the following guidelines befor
   ```bash
   make check_lint
   ```
-  If you want to fix linting errors automatically, run
+- If you want to fix linting errors automatically, run
 
   ```bash
   make lint
   ```
 
-1. To run tests:
+- To run tests:
 
     ```bash
     make test
     ```
 
-6. To check code style:
+- To check code style:
 
     ```bash
-    make check_lint
+    make check_format
     ```
 
+- To fix code style automatically:
+
+    ```bash
+    make format
+    ```
+
+## Translations
+
+### For translators
+To kick off translations for the website we are going to start without any cloud-based
+collaborative translation service. This means translating will be similar to
+code contributions, people will open a PR adding the translations to the `.po` files
+inside `/locales/es/LC_MESSAGES`. PO files can be edited as raw text or with an
+editor designed for translating like [Poedit](https://poedit.net/).
+
+
+### For language coordinators/release managers
+To keep the workflow simple, we will only update the translatable sources every now and then.
+One option is to do that with every release, another option is doing it every now and then
+on a different cadence.
+
+The steps to follow to update the translatable sources are:
+
+1. Generate the updated translatable messages with Sphinx. This is similar to building
+   the website (also take more or less as long) but it generates a different kind of
+   output: `.pot` files which are a template for the language specific `.po` files
+   we'll generate later.
+
+   ```bash
+   sphinx-build docs/source docs/gettext -b gettext
+   ```
+1. Update the Spanish `.po` files
+
+   ```bash
+   sphinx-intl update -p docs/gettext -l es --locale-dir locales
+   ```
+
+### Translated build preview
+
+To build the docs in a different language:
+
+```bash
+sphinx-build docs/source docs/build -b html -D language=es
+```
 
 ## Overview of the MMM codebase
 
@@ -167,6 +211,23 @@ Classes
 
 ![](docs/source/uml/classes_clv.png)
 
+## Overview of the customer choice codebase
+
+Packages
+
+![](docs/source/uml/packages_customer_choice.png)
+
+Classes
+
+![](docs/source/uml/classes_customer_choice.png)
+
+## 2025 CLV Roadmap
+
+![](docs/source/_static/clv_roadmap_2025.png)
+
+Review [task prioritization YAML](scripts/roadmaps/clv_tasks_priority.yaml) and open repo
+[issues](https://github.com/pymc-labs/pymc-marketing/issues?q=is%3Aissue%20state%3Aopen%20label%3ACLV) to work on.
+
 ---
 
-This guide takes some inspiration from the [Bambi guide to contributing](https://github.com/bambinos/bambi/blob/main/docs/CONTRIBUTING.md)
+This guide takes some inspiration from the [Bambi guide to contributing](https://github.com/bambinos/bambi/blob/main/CONTRIBUTING.md)

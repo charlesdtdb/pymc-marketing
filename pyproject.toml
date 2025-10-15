@@ -1,67 +1,163 @@
 [build-system]
-build-backend = "setuptools.build_meta"
-requires = ["setuptools>=61.0"]
+build-backend = "hatchling.build"
+requires = ["hatchling<2", "hatch-fancy-pypi-readme"]
 
 [project]
 name = "pymc-marketing"
 description = "Marketing Statistical Models in PyMC"
-requires-python = ">=3.9"
-readme = "README.md"
+requires-python = ">=3.11"
 license = { file = "LICENSE" }
-dynamic = ["version"]
-maintainers = [{ name = "PyMC Labs", email = "info@pymc-labs.io" }]
+dynamic = ["version", "readme"]
+maintainers = [{ name = "PyMC Labs", email = "info@pymc-labs.com" }]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
 
 dependencies = [
     "arviz>=0.13.0",
     "matplotlib>=3.5.1",
-    "numpy>=1.17,<1.25",
+    "numpy>=1.17",
     "pandas",
-    # NOTE: Keep minimum pymc version in sync with ci.yml `OLDEST_PYMC_VERSION`
-    "pymc>=5.8.2",
+    "pydantic>=2.1.0",
+    # NOTE: Used as minimum pymc version with test.yml `OLDEST_PYMC_VERSION`
+    "pymc>=5.24.1",
+    "pytensor>=2.31.3",
     "scikit-learn>=1.1.1",
     "seaborn>=0.12.2",
-    "xarray",
+    "xarray>=2024.1.0",
     "xarray-einstats>=0.5.1",
+    "pyprojroot",
+    "pymc-extras>=0.4.0",
+    "preliz>=0.20.0",
 ]
 
 [project.optional-dependencies]
+dag = ["dowhy", "networkx", "osqp<1.0.0,>=0.6.2", "pygraphviz"]
 docs = [
-    "sphinx",
+    "blackjax",
+    "fastprogress",
+    "graphviz",
     "ipython!=8.7.0",
+    "ipywidgets",
+    "labs-sphinx-theme",
+    "lifetimes",
+    "myst-nb>=1.1.2",
     "myst-parser",
-    "myst-nb",
-    "pydata-sphinx-theme>=0.12.0.dev0",
-    "sphinx-copybutton",
+    "numba",
+    "numpydoc",
+    "numpyro",
+    "nutpie",
+    "pylint",
     "sphinx-autodoc-typehints",
-    "sphinxext-opengraph",
-    "sphinx-notfound-page",
+    "sphinx-copybutton",
     "sphinx-design",
+    "sphinx-notfound-page",
+    "sphinx-remove-toctrees",
+    "sphinx",
+    "sphinxext-opengraph",
+    "watermark",
+    "mlflow>=2.0.0",
+    "networkx",
+    "dowhy",
+    "osqp<1.0.0,>=0.6.2",
+    "preliz>=0.20.0",
 ]
-lint = [
-    "mypy",
-    "pandas-stubs",
-    "pre-commit>=2.19.0",
-    "ruff>=0.1.4",
+lint = ["mypy", "pandas-stubs", "pre-commit>=2.19.0", "ruff>=0.1.4"]
+test = [
+    "blackjax",
+    "nutpie",
+    "numpyro",
+    "jax<0.7.0", # related to https://github.com/pyro-ppl/numpyro/issues/2051
+    "graphviz>=0.20.1",
+    "lifetimes==0.11.3",
+    "papermill",
+    "pyprojroot",
+    "pytest-cov>=3.0.0",
+    "pytest-mock>=3.14.0",
+    "pytest>=7.0.1",
+    "mlflow>=2.0.0",
+    "networkx",
+    "dowhy",
+    "osqp<1.0.0,>=0.6.2",
+    "pygraphviz",
+    "preliz>=0.20.0",
 ]
-test = ["lifetimes==0.11.3", "pytest==7.0.1", "pytest-cov==3.0.0"]
 
-[tool.setuptools]
-packages = [
-    "pymc_marketing",
-    "pymc_marketing.mmm",
-    "pymc_marketing.clv",
-    "pymc_marketing.clv.models",
-]
+[tool.hatch.build.targets.sdist]
+exclude = ["docs"]
 
-[tool.setuptools.dynamic]
-version = { file = "pymc_marketing/version.txt" }
+[tool.hatch.version]
+path = "pymc_marketing/version.py"
+
+# <https://github.com/hynek/hatch-fancy-pypi-readme>
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+# Image links should go to the raw content on GitHub
+# <https://stackoverflow.com/a/46875147>
+pattern = '\[(.*?)\]\(((?!https?://)\S+\.(png|jpe?g|svg|gif))\)'
+replacement = '[\1](https://raw.githubusercontent.com/pymc-labs/pymc-marketing/main/\g<2>)'
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+# Handle also HTML image tags
+pattern = '''(<img\b[^>]*\bsrc=)(['"])((?!https?://)[^'"]+)(['"][^>]*>)'''
+replacement = '<img src="https://raw.githubusercontent.com/pymc-labs/pymc-marketing/main/\g<3>\g<4>'
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+# Remaining non-image relative links map to the normal absolute GitHub URL
+# <https://stackoverflow.com/a/46875147>
+pattern = '\[(.*?)\]\(((?!https?://)\S+)\)'
+replacement = '[\1](https://github.com/pymc-labs/pymc-marketing/tree/main/\g<2>)'
 
 [project.urls]
 repository = "https://github.com/pymc-labs/pymc-marketing"
-# Other options
-#homepage = "https://bambinos.github.io/bambi"
-#documentation = ""
-#changelog = ""
+homepage = "https://www.pymc-marketing.io"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = ["B", "D", "DOC", "E", "F", "I", "RUF", "S", "UP", "W"]
+pydocstyle.convention = "numpy"
+ignore = [
+    "B008",   # Do not perform calls in argument defaults (this is ok with Field from pydantic)
+    "B904",   # raise-without-from-inside-except
+    "RUF001", # String contains ambiguous character (such as Greek letters)
+    "RUF002", # Docstring contains ambiguous character (such as Greek letters)
+    "RUF012", # Mutable class attributes should be annotated with `typing.ClassVar`
+]
+[tool.ruff.lint.per-file-ignores]
+"docs/source/notebooks/*" = [
+    "B018", # Checks for "useless" expressions. Not useful for notebooks.
+    "D103", # Missing docstring in public function.
+]
+"tests/*" = [
+    "B018", # Checks for "useless" expressions. This is useful for tests.
+    "D",
+    "S101", # Use of assert
+]
+"scripts/*" = ["D"]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 120
+
+[tool.ruff]
+extend-include = ["*.ipynb"]
 
 [tool.pytest.ini_options]
 addopts = [
@@ -70,7 +166,29 @@ addopts = [
     "--strict-config",
     "--cov=pymc_marketing",
     "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--no-cov-on-fail",
+    "--durations=50",
     "--color=yes",
 ]
 filterwarnings = ["ignore::DeprecationWarning:bokeh.core.property.primitive:37"]
 testpaths = "tests"
+
+[tool.mypy]
+files = "pymc_marketing/*.py"
+exclude = "build|dist|docs|examples|tests|setup.py"
+
+[tool.mypy-matplotlib]
+ignore_missing_imports = true
+
+[tool.mypy-pymc]
+ignore_missing_imports = true
+
+[tool.mypy-seaborn]
+ignore_missing_imports = true
+
+[tool.mypy-sklearn]
+ignore_missing_imports = true
+
+[tool.mypy-scipy]
+ignore_missing_imports = true
